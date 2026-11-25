@@ -1,0 +1,371 @@
+<title>VTC Plus Fleet Agreement</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Layout: cabecera verde oscuro, tira de estado, KPIs, panel kickback, pestañas (Semanas · Flotas · Condiciones). Paleta Bolt. */
+:root{
+  --bg:#ffffff; --surface:#f6f9f7; --fg:#0b1a12; --muted:#52645a; --border:#e0e8e3;
+  --accent:#2A9C64; --accent-soft:#e3f4ea; --head:#0C2C1C; --head-fg:#ffffff; --head-muted:#9db8a8;
+  --warn:#b45309; --warn-soft:#fdf3e3; --bad:#C0392B; --bad-soft:#fdecea; --row-alt:#fafbfa; --row-hover:#edf5f0; --grid:#e3e8e5; --line2:#0C2C1C;
+  --font:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0a1a12; --surface:#102419; --fg:#f2f7f4; --muted:#9db8a8; --border:#1f3a2a;
+  --accent:#3fbf80; --accent-soft:#143826; --warn:#f0b35a; --warn-soft:#33260f; --bad:#ff7a6b; --bad-soft:#3a1a17; --row-alt:#0e2016; --row-hover:#16301f; --grid:#1f3a2a; --line2:#f2f7f4; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a1a12; --surface:#102419; --fg:#f2f7f4; --muted:#9db8a8; --border:#1f3a2a;
+  --accent:#3fbf80; --accent-soft:#143826; --warn:#f0b35a; --warn-soft:#33260f; --bad:#ff7a6b; --bad-soft:#3a1a17; --row-alt:#0e2016; --row-hover:#16301f; --grid:#1f3a2a; --line2:#f2f7f4; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-weight:500;font-size:13px;line-height:1.45}
+.pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.hdr{background:var(--head);color:var(--head-fg)}
+.hdr .pad{display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap;padding-block:14px}
+.hdr h1{font-size:16px;font-weight:600;margin:0}
+.hdr .sub{font-size:11px;color:var(--head-muted)}
+.hdr .ctl{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+select{background:rgba(255,255,255,.08);border:1px solid #2a5a3a;color:var(--head-fg);padding:6px 10px;border-radius:6px;font:inherit;font-weight:600;cursor:pointer}
+select option{background:#0C2C1C;color:#fff}
+.btn{font:inherit;font-size:12px;font-weight:700;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+select:focus-visible,.btn:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.status{display:flex;gap:8px 16px;align-items:center;flex-wrap:wrap;padding-block:8px;font-size:11.5px;color:var(--muted)}
+.status.err{color:var(--bad);font-weight:600}
+.chip{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:9px;background:var(--accent-soft);color:var(--accent)}
+.chip.w{background:var(--warn-soft);color:var(--warn)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));border-bottom:1px solid var(--border)}
+.kpi{padding:14px 16px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-width:0}
+.kpi .l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.kpi .v{font-size:21px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:11px;color:var(--muted);margin-top:2px}
+.kpi.sp .v{color:var(--accent)}
+.kpi.over .v{color:var(--bad)}
+.sec{padding-block:16px;display:flex;flex-direction:column;gap:16px}
+.card{border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:0}
+.card-h{padding:10px 14px;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.card-h .grow{margin-left:auto;color:var(--muted);font-weight:500}
+.chart-body{height:300px;padding:12px 16px;position:relative}
+.scroll{overflow:auto;max-height:560px}
+table{border-collapse:separate;border-spacing:0;font-size:12.5px;font-variant-numeric:tabular-nums;margin:0 auto}
+th{position:sticky;top:0;z-index:2;background:var(--surface);color:var(--muted);font-weight:700;text-align:center;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--head);vertical-align:bottom;min-width:84px}
+td{padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:center}
+th:first-child,td:first-child{text-align:left}
+tbody td:first-child{font-weight:600}
+tbody tr:nth-child(even) td{background:var(--row-alt)}
+tbody tr:hover td{background:var(--row-hover)}
+tfoot td{font-weight:800;background:var(--accent-soft)!important;border-top:2px solid var(--accent)}
+.tabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:11px 16px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab.on{color:var(--fg);border-bottom-color:var(--accent)}
+.panel{display:none}.panel.on{display:block}
+.tier{padding:16px}
+.bar{position:relative;height:14px;background:var(--surface);border:1px solid var(--border);border-radius:7px;margin:34px 0 30px}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:7px 0 0 7px}
+.bar .proj{position:absolute;top:-1px;bottom:-1px;width:0;border-left:2px dashed var(--warn)}
+.bar .tk{position:absolute;top:-6px;bottom:-6px;width:1px;background:var(--muted)}
+.bar .tl{position:absolute;top:20px;transform:translateX(-50%);font-size:10.5px;color:var(--muted);white-space:nowrap;text-align:center}
+.bar .tl b{display:block;color:var(--fg)}
+.bar .pl{position:absolute;top:-24px;transform:translateX(-50%);font-size:10.5px;font-weight:800;white-space:nowrap}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tgrid div{border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.tgrid .l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.tgrid .v{font-size:16px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.tgrid .s{font-size:11px;color:var(--muted);margin-top:2px}
+.bar .fill{cursor:help}
+.bar .ft{display:none;position:absolute;right:0;bottom:calc(100% + 8px);transform:translateX(50%);background:var(--head);color:var(--head-fg);font-size:11.5px;font-weight:600;padding:6px 10px;border-radius:6px;white-space:nowrap;z-index:5;pointer-events:none}
+.bar .fill:hover .ft{display:block}
+/* ancho máximo centrado para que se vea bien en pantallas anchas */
+.hdr .pad,.status,.kpis,.tabs,.main{max-width:1180px;margin-left:auto;margin-right:auto}
+.band{background:var(--surface);border-bottom:1px solid var(--border)}
+.scroll table{width:100%}
+.cond{padding:16px;max-width:860px}
+.cond h3{font-size:13px;font-weight:600;margin:16px 0 8px}
+.cond h3:first-child{margin-top:0}
+.cond p,.cond li{font-size:12.5px;line-height:1.65}
+.cond ul{padding-left:18px;margin:0}
+.cond table{margin:8px 0;min-width:300px}
+.pill{display:inline-block;background:var(--accent-soft);border-radius:999px;padding:2px 10px;font-size:11px;font-weight:600;margin:2px}
+.note{font-size:11px;color:var(--muted);padding:6px 0 18px}
+.bad{color:var(--bad);font-weight:800}
+@media (max-width:560px){.hdr .ctl{margin-left:0}}
+</style>
+
+<div class="hdr"><div class="pad">
+  <h1>VTC Plus · Fleet Agreement</h1>
+  <span class="sub" id="sub">Vigente desde el 1 de octubre de 2026</span>
+  <div class="ctl">
+    <select id="selMonth" aria-label="Mes"></select>
+  </div>
+</div></div>
+<div class="band"><div class="status pad" id="status"><span id="stTxt">Iniciando…</span></div></div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="tabs pad">
+  <button class="tab on" data-t="sum">Resumen</button>
+  <button class="tab" data-t="cond">Condiciones</button>
+</div>
+
+<div class="pad main">
+<div class="panel on sec" id="p-sum">
+  <div class="card"><div class="card-h">Kickback de flota del mes (por viajes)<span class="grow" id="tierSub"></span></div>
+    <div class="tier"><div class="bar" id="tierBar"></div><div class="tgrid" id="tierGrid"></div></div></div>
+  <div class="card"><div class="card-h">Ingresos brutos diarios y rides</div><div class="chart-body"><canvas id="chart"></canvas></div></div>
+  <div class="note">Del día 1 al último día completo del mes.</div>
+  <div class="card"><div class="card-h">Performance mensual por flota<span class="grow" id="flSub"></span></div><div class="scroll"><table id="tFleets"></table></div></div>
+  <div class="note" id="flNote"></div>
+  <div class="card"><div class="card-h">Branding por semana (Lun–Dom, asignada al mes en que termina)<span class="grow" id="wkSub"></span></div><div class="scroll"><table id="tWeeks"></table></div></div>
+</div>
+<div class="panel sec" id="p-cond"><div class="card cond" id="condBody"></div></div>
+<div class="note" id="foot"></div>
+</div>
+
+<script>window.BAKED={"months":{"2026-10":{"ids":[47653,79395,108891,109555,109559,109649,114118,114265,114481,172522,174660,174670,186715,190177,190729,203946,211950,211982,215096,221987,289295,290198,292134,294721,301089,329240,343682,376272,382836,383751,399934,400536],"names":{"47653":"Alberto Toledo Fernandez","79395":"Antonio Suárez Salazar","108891":"Roberto Baena Rodríguez","109555":"Alberto Serrano Ramírez","109559":"María de los Ángeles Vicente Moranchel","109649":"Borja Rodríguez Martínez","114118":"Sandra Lara Ubierna","114265":"Ruth Martin Muñoz","114481":"Elena Zancajo Montiel","172522":"Marta Yolanda Muñoz Sande","174660":"Raquel María Torres Serrano de la Cruz","174670":"Christian Anguas Jiménez","186715":"Eider Ródriguez Martínez","190177":"Marcos García Machuca","190729":"Pedro Valderas Postigo","203946":"Eugenia Paz Latrille Ramírez","211950":"Yolanda Tebar Murillo","211982":"Marta Olivares Aires","215096":"Navalazarza Martín Constanza","221987":"Raúl Vega Carbajal","289295":"Esperanza Baeza Fernández","290198":"Lourdes Martín Álvarez","292134":"Irene Romero Martín","294721":"Ivan Fernandez Gracia","301089":"Miriam Sainz Ezquerra Sánchez","329240":"CCI 2020 INTERNATIONAL SL.","343682":"VOLTAJE SOBRE RUEDAS E INVERSIONES SL","376272":"Fernandez Iglesias Eduardo","382836":"Lanseros Pardo Rebeca","383751":"Tebar Murillo Maria Luisa","399934":"Morales González Oscar","400536":"YARD CARS SL"},"c":{"cos":[{"brand":1656.38,"busy":434.96999999999986,"gAl":15068.810000000001,"gmv":18411.999999999996,"id":47653,"net":13758.510000000002,"oh":513.08,"rides":1049},{"brand":1061.1599999999999,"busy":365.9,"gAl":9946.039999999999,"gmv":12540.43,"id":79395,"net":9387.849999999999,"oh":418.37,"rides":810},{"brand":1299.0800000000002,"busy":298.25000000000006,"gAl":9989.679999999998,"gmv":11370.839999999998,"id":108891,"net":8526.46,"oh":345.9000000000001,"rides":727},{"brand":1718.03,"busy":419.8400000000001,"gAl":12523.5,"gmv":16016.72,"id":109555,"net":11966.53,"oh":479.53999999999996,"rides":962},{"brand":1797.2300000000002,"busy":374.7500000000001,"gAl":13367.18,"gmv":16346.27,"id":109559,"net":12223.050000000001,"oh":434.62,"rides":984},{"brand":1845.58,"busy":424.53,"gAl":13398.599999999999,"gmv":16520.570000000003,"id":109649,"net":12323.669999999998,"oh":527.98,"rides":873},{"brand":1488.5100000000002,"busy":351.93000000000006,"gAl":10937.12,"gmv":13207.320000000002,"id":114118,"net":9878.280000000002,"oh":431.17999999999995,"rides":819},{"brand":1779.84,"busy":432.38000000000005,"gAl":12912.910000000002,"gmv":16152.94,"id":114265,"net":12089.119999999999,"oh":517.07,"rides":999},{"brand":1858.04,"busy":340.42,"gAl":13529.07,"gmv":16376.669999999998,"id":114481,"net":12261.789999999995,"oh":401.23999999999995,"rides":860},{"brand":1694.5700000000002,"busy":381.51000000000005,"gAl":12288.25,"gmv":15846.960000000003,"id":172522,"net":11805.660000000002,"oh":491.8900000000001,"rides":850},{"brand":1352.48,"busy":408.0499999999999,"gAl":12852.319999999998,"gmv":15582.72,"id":174660,"net":11661.16,"oh":462.86999999999995,"rides":961},{"brand":1630.82,"busy":473.15999999999997,"gAl":14534.49,"gmv":19899.15,"id":174670,"net":14898.13,"oh":568.4799999999999,"rides":1116},{"brand":883.23,"busy":288.38,"gAl":11330.99,"gmv":13681.530000000002,"id":186715,"net":10209.26,"oh":389.81,"rides":648},{"brand":0,"busy":5.69,"gAl":497.42999999999995,"gmv":541.76,"id":190177,"net":409.09000000000003,"oh":36.940000000000005,"rides":8},{"brand":1292.07,"busy":387.96999999999997,"gAl":11485.529999999999,"gmv":14347.17,"id":190729,"net":10718.419999999998,"oh":445.9400000000001,"rides":871},{"brand":1197.74,"busy":319.69999999999993,"gAl":11592.82,"gmv":14601.740000000002,"id":203946,"net":10904.179999999998,"oh":421.55999999999995,"rides":731},{"brand":1445.6899999999998,"busy":343.3199999999999,"gAl":12468.640000000001,"gmv":15313.23,"id":211950,"net":11436.31,"oh":412.7999999999999,"rides":791},{"brand":1376.6399999999999,"busy":383.85,"gAl":12544.489999999998,"gmv":15369.13,"id":211982,"net":11519.019999999997,"oh":451.74999999999994,"rides":937},{"brand":0,"busy":103.4,"gAl":5086.189999999999,"gmv":5795.079999999998,"id":215096,"net":4326.08,"oh":246.28,"rides":177},{"brand":972.04,"busy":249.29999999999998,"gAl":8684.03,"gmv":10167.87,"id":221987,"net":7610.409999999999,"oh":274.53999999999996,"rides":627},{"brand":1223.66,"busy":311.5099999999999,"gAl":11136.760000000002,"gmv":13233.630000000003,"id":289295,"net":9905.6,"oh":391.75999999999993,"rides":651},{"brand":1433.23,"busy":364.9699999999999,"gAl":12578.700000000003,"gmv":15464.140000000001,"id":290198,"net":11553.519999999997,"oh":482.24000000000007,"rides":749},{"brand":1206.9299999999998,"busy":324.84,"gAl":10390.350000000002,"gmv":13199.630000000003,"id":292134,"net":9865.470000000001,"oh":375.96999999999997,"rides":772},{"brand":1116.09,"busy":349.50999999999993,"gAl":9888.519999999999,"gmv":13163.519999999999,"id":294721,"net":9839.699999999999,"oh":410.9100000000001,"rides":889},{"brand":1469.31,"busy":368.36,"gAl":12831.490000000002,"gmv":16870.100000000002,"id":301089,"net":12605.880000000001,"oh":449.88999999999993,"rides":932},{"brand":1119.75,"busy":320.32,"gAl":9526.770000000004,"gmv":12040.29,"id":329240,"net":8994.91,"oh":362.39,"rides":728},{"brand":1395.25,"busy":294.4799999999999,"gAl":7809.719999999998,"gmv":10158.98,"id":343682,"net":7596.169999999999,"oh":343.14000000000004,"rides":655},{"brand":0,"busy":30.730000000000004,"gAl":2408.06,"gmv":2494.41,"id":376272,"net":1870.8000000000002,"oh":158.39000000000001,"rides":56},{"brand":669.3399999999999,"busy":334.38000000000005,"gAl":9367.600000000002,"gmv":12449.59,"id":382836,"net":9329.409999999998,"oh":388.71999999999997,"rides":792},{"brand":398.27,"busy":214.45,"gAl":4940.139999999999,"gmv":7526.789999999999,"id":383751,"net":5639.66,"oh":259.08000000000004,"rides":467},{"brand":0,"busy":0,"gAl":0,"gmv":0,"id":399934,"net":0,"oh":0,"rides":0},{"brand":0,"busy":0,"gAl":0,"gmv":0,"id":400536,"net":0,"oh":0,"rides":0}],"m":{"acc":28221,"accEff":94.61226405605659,"accTotal":45.508933754757145,"acco":11807,"accr":16413,"brand":36380.96000000001,"brandPct":10.419395671522643,"busy":9700.850000000002,"capped":false,"comp":77.44301356655878,"compAll":36.26878668644778,"den":29042,"eph":33.18313683914943,"fleet":0,"fleetGross":0,"fleetPct":0,"gmv":394691.18000000046,"net":295114.09999999986,"netv":295114.09999999986,"oh":11894.330000000009,"proj":22491,"projFleet":0,"projGmv":394691.18000000046,"projTier":0,"reja":0,"rejr":1607,"req":18020,"rides":22491,"rph":1.8909009586920813,"supplyPct":10.419395671522643,"tier":0,"tries":62012,"util":81.55860817717345},"wks":[{"acc":5832,"accEff":93.79221614667095,"accTotal":40.89474791389103,"acco":2504,"accr":3328,"brand":8732.2,"brandPct":10.03741991340798,"busy":1996.5900000000006,"cars":26,"comp":76.8019884009942,"compAll":32.50122712292266,"den":6035,"done":true,"eph":36.31965098317535,"gmv":86996.45999999993,"mon":"2026-09-28","net":65123.69000000001,"netv":65123.69000000001,"oh":2395.3000000000006,"reja":0,"rejr":386,"req":3714,"rides":4635,"rph":1.9350394522606766,"sun":"2026-10-04","tries":14261,"util":83.35448586815848},{"acc":6066,"accEff":93.55236773098873,"accTotal":41.2484700122399,"acco":2758,"accr":3307,"brand":9211.820000000002,"brandPct":10.496867514910358,"busy":2103.67,"cars":26,"comp":76.21931781957284,"compAll":32.51733986128111,"den":6274,"done":true,"eph":34.439268657360714,"gmv":87757.8,"mon":"2026-10-05","net":65612.17000000003,"netv":65612.17000000003,"oh":2548.19,"reja":0,"rejr":418,"req":3725,"rides":4782,"rph":1.8766261542506641,"sun":"2026-10-11","tries":14706,"util":82.55546093501663},{"acc":6398,"accEff":94.96509728204366,"accTotal":42.247754886423664,"acco":2717,"accr":3677,"brand":9667.239999999998,"brandPct":11.049736639431819,"busy":2179.43,"cars":28,"comp":78.1021897810219,"compAll":33.914421553090335,"den":6576,"done":true,"eph":32.73997649894097,"gmv":87488.42000000003,"mon":"2026-10-12","net":65436.709999999985,"netv":65436.709999999985,"oh":2672.22,"reja":0,"rejr":339,"req":4016,"rides":5136,"rph":1.9219974403305118,"sun":"2026-10-18","tries":15144,"util":81.55877884305933},{"acc":6530,"accEff":94.93744544661041,"accTotal":52.50462330143926,"acco":2621,"accr":3905,"brand":8769.700000000003,"brandPct":10.089037362467453,"busy":2228.0599999999986,"cars":29,"comp":76.82416267942584,"compAll":41.312213556323876,"den":6688,"done":true,"eph":31.572679624134164,"gmv":86923.06000000001,"mon":"2026-10-19","net":64999.22000000001,"netv":64999.22000000001,"oh":2753.11,"reja":0,"rejr":348,"req":4253,"rides":5138,"rph":1.8662530737965428,"sun":"2026-10-25","tries":12437,"util":80.92884047495372}],"days":[{"d":"2026-10-01","gmv":8383.829999999998,"rides":479,"sp":10.037419913407975},{"d":"2026-10-02","gmv":11966.169999999998,"rides":670,"sp":10.037419913407975},{"d":"2026-10-03","gmv":18354.51,"rides":881,"sp":10.037419913407975},{"d":"2026-10-04","gmv":15042.41,"rides":678,"sp":10.037419913407975},{"d":"2026-10-05","gmv":10107.049999999997,"rides":539,"sp":10.496867514910358},{"d":"2026-10-06","gmv":11435.99,"rides":577,"sp":10.496867514910358},{"d":"2026-10-07","gmv":10380.819999999998,"rides":566,"sp":10.496867514910358},{"d":"2026-10-08","gmv":10208.400000000003,"rides":645,"sp":10.496867514910358},{"d":"2026-10-09","gmv":13718.51,"rides":801,"sp":10.496867514910358},{"d":"2026-10-10","gmv":17217.23,"rides":941,"sp":10.496867514910358},{"d":"2026-10-11","gmv":14689.800000000001,"rides":713,"sp":10.496867514910358},{"d":"2026-10-12","gmv":14636.829999999998,"rides":690,"sp":11.049736639431822},{"d":"2026-10-13","gmv":11999.130000000003,"rides":660,"sp":11.049736639431822},{"d":"2026-10-14","gmv":10310.150000000001,"rides":660,"sp":11.049736639431822},{"d":"2026-10-15","gmv":10090.15,"rides":661,"sp":11.049736639431822},{"d":"2026-10-16","gmv":12272.119999999999,"rides":815,"sp":11.049736639431822},{"d":"2026-10-17","gmv":14482.209999999997,"rides":854,"sp":11.049736639431822},{"d":"2026-10-18","gmv":13697.830000000002,"rides":796,"sp":11.049736639431822},{"d":"2026-10-19","gmv":10527.43,"rides":642,"sp":10.089037362467453},{"d":"2026-10-20","gmv":9359.119999999997,"rides":598,"sp":10.089037362467453},{"d":"2026-10-21","gmv":10554.92,"rides":661,"sp":10.089037362467453},{"d":"2026-10-22","gmv":10045.55,"rides":644,"sp":10.089037362467453},{"d":"2026-10-23","gmv":13415.060000000003,"rides":802,"sp":10.089037362467453},{"d":"2026-10-24","gmv":16438.910000000003,"rides":900,"sp":10.089037362467453},{"d":"2026-10-25","gmv":16582.069999999996,"rides":891,"sp":10.089037362467453},{"d":"2026-10-26","gmv":11098.390000000001,"rides":661,"sp":null},{"d":"2026-10-27","gmv":10718.379999999997,"rides":733,"sp":null},{"d":"2026-10-28","gmv":10857.789999999999,"rides":705,"sp":null},{"d":"2026-10-29","gmv":12059.160000000002,"rides":694,"sp":null},{"d":"2026-10-30","gmv":15475.779999999997,"rides":916,"sp":null},{"d":"2026-10-31","gmv":18565.480000000003,"rides":1018,"sp":null}]},"frozenAt":"2026-11-24T09:33:29.783Z","asOf":"2026-11-24T09:33:29.783Z","dataEnd":"2026-10-31"}}};window.BAKED_DATE="2026-11-24";</script>
+<script>
+"use strict";
+const START_YM="2026-10";
+const CAP=14.5;
+const TIERS=[[24000,1],[28000,2],[32000,3],[35000,4]];
+const NG="main.ng_public";
+const $=id=>document.getElementById(id);
+const nf=(v,d=0)=>(v==null||!isFinite(v))?"—":(+v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const eur=(v,d=0)=>v==null||!isFinite(v)?"—":"€"+nf(v,d);
+const pct=(v,d=1)=>v==null||!isFinite(v)?"—":nf(v,d)+"%";
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const MES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const iso=d=>d.toISOString().slice(0,10);
+const U=(y,m,d)=>new Date(Date.UTC(y,m,d));
+const addD=(d,n)=>new Date(d.getTime()+n*864e5);
+const parseD=s=>{const [y,m,d]=s.split("-").map(Number);return U(y,m-1,d);};
+function madridToday(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid"}).format(new Date());}
+function setStatus(t,err){const s=$("status");s.className="status pad"+(err?" err":"");$("stTxt").textContent=t;}
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+
+// ---------- consultas ----------
+function monthInfo(ym){
+  const [y,m]=ym.split("-").map(Number);
+  const ms=U(y,m-1,1), me=U(y,m,0);
+  const today=parseD(madridToday()), yest=addD(today,-1);
+  const closed=me<=yest;
+  const dataEnd=closed?me:(yest<ms?addD(ms,-1):yest);
+  const first=addD(ms,-((ms.getUTCDay()+6)%7));
+  return {ym,ms,me,today,yest,closed,dataEnd,first,days:me.getUTCDate(),elapsed:Math.max(0,dataEnd.getUTCDate()-(dataEnd<ms?0:0))*(dataEnd>=ms?1:0)};
+}
+function weeksOf(mi){
+  const out=[];
+  for(let mon=mi.first;mon<=mi.me;mon=addD(mon,7)){
+    const sun=addD(mon,6);
+    if(sun<mi.ms||sun>mi.me)continue;
+    out.push({mon:iso(mon),sun:iso(sun),done:sun<=mi.yest});
+  }
+  return out;
+}
+const SQLS={
+ names:(ids)=>`SELECT id, name FROM ${NG}.fleet_company WHERE id IN (${ids})`,
+ inc:(ids,s,e)=>`SELECT a.external_id cid, CAST(DATE(CONVERT_TIMEZONE('Europe/Madrid',e.created)) AS STRING) d, ROUND(SUM(e.amount),2) net, ROUND(SUM(CASE WHEN e.external_type IN ('ride_hailing-ride_fee','ride_hailing-toll_road','ride_hailing-bolt_rider_booking_fee','ride_hailing-cancellation_fee','ride_hailing-tips') THEN e.amount ELSE 0 END),2) gross FROM main.ng_payout.invoicing_balance_balance_entry e JOIN main.ng_payout.invoicing_balance_account a ON a.id=e.account_id WHERE a.external_id IN (${ids}) AND a.type IN ('ride_hailing_fleet','ride_hailing_fleet_external') AND e.created_date BETWEEN CAST(DATE_SUB(DATE'${s}',1) AS STRING) AND CAST(DATE_ADD(DATE'${e}',1) AS STRING) AND DATE(CONVERT_TIMEZONE('Europe/Madrid',e.created)) BETWEEN '${s}' AND '${e}' AND e.external_type IN ('ride_hailing-ride_fee','ride_hailing-toll_road','ride_hailing-bolt_rider_booking_fee','ride_hailing-cancellation_fee','ride_hailing-tips','ride_hailing-fee','ride_hailing-bolt_booking_fee_collection') GROUP BY 1,2`,
+ ops:(ids,s,e)=>`SELECT driver_company_id cid, CAST(created_date_local AS STRING) d, COUNT(*) tries, SUM(CASE WHEN has_driver_accepted THEN 1 ELSE 0 END) acc, SUM(CASE WHEN order_try_state='finished' THEN 1 ELSE 0 END) rides, SUM(CASE WHEN order_try_state='driver_did_not_respond' THEN 0 WHEN order_try_state='driver_rejected' AND NOT COALESCE(has_driver_accepted,false) THEN 0 ELSE 1 END) den FROM main.core_models.fact_rides_order_try WHERE driver_company_id IN (${ids}) AND created_date_local BETWEEN '${s}' AND '${e}' GROUP BY 1,2`,
+ hrs:(ids,s,e)=>`SELECT company_id cid, CAST(date AS STRING) d, ROUND(SUM(has_order_seconds+waiting_orders_seconds)/3600.0,2) oh, ROUND(SUM(has_order_seconds)/3600.0,2) busy FROM ${NG}.driver_online_hours_daily WHERE company_id IN (${ids}) AND date BETWEEN '${s}' AND '${e}' GROUP BY 1,2`,
+ rad:(ids,s,e)=>`SELECT company_id cid, CAST(date AS STRING) d, SUM(required_orders_count) req, SUM(accepted_required_orders_count) accr, SUM(accepted_optional_orders_count) acco, SUM(rejected_required_orders_count) rejr FROM ${NG}.driver_reporting_vehicle_acceptance_rate_day WHERE company_id IN (${ids}) AND date BETWEEN '${s}' AND '${e}' AND COALESCE(_deleted_from_source,false)=false GROUP BY 1,2`,
+ brand:(ids,s,e)=>`WITH calc AS (SELECT pe.target_id id, fc.company_id cid, CAST(CONVERT_TIMEZONE('Europe/Madrid', pe.start) AS DATE) wk, bc.condition_id, MAX(CASE WHEN b.id IS NOT NULL AND COALESCE(b.state,'') NOT IN ('cancelled','failed') THEN CAST(GET_JSON_OBJECT(b.earning,'$.amount') AS DOUBLE) END) amt FROM ${NG}.conditional_campaigns_period_enrollment pe JOIN ${NG}.conditional_campaigns_campaign camp ON pe.campaign_id=camp.id AND camp.name LIKE '%CarBranding%' JOIN ${NG}.fleet_car fc ON pe.target_id=fc.id AND fc.company_id IN (${ids}) JOIN ${NG}.conditional_campaigns_bonus_calculation bc ON bc.period_enrollment_id=pe.id LEFT JOIN ${NG}.conditional_campaigns_bonus b ON bc.bonus_id=b.id WHERE pe.target_type='car' AND pe.start >= TIMESTAMP'${s} 00:00:00' - INTERVAL 1 DAY AND pe.start < TIMESTAMP'${e} 00:00:00' + INTERVAL 1 DAY GROUP BY 1,2,3,4) SELECT cid, CAST(wk AS STRING) wk, COUNT(DISTINCT id) cars, ROUND(SUM(COALESCE(amt,0)),2) brand FROM calc GROUP BY 1,2`
+};
+// ---------- cálculo ----------
+const N=x=>+x||0;
+function agg(opsRows,radRows,from,to){
+  const a={gmv:0,netv:0,rides:0,oh:0,busy:0,tries:0,acc:0,reja:0,den:0,req:0,accr:0,acco:0,rejr:0};
+  opsRows.forEach(r=>{if(r.d<from||r.d>to)return;a.gmv+=N(r.gross);a.netv+=N(r.net);a.rides+=N(r.rides);a.oh+=N(r.oh);a.busy+=N(r.busy);a.tries+=N(r.tries);a.acc+=N(r.acc);a.reja+=N(r.reja);a.den+=N(r.den);});
+  radRows.forEach(r=>{if(r.d<from||r.d>to)return;a.req+=N(r.req);a.accr+=N(r.accr);a.acco+=N(r.acco);a.rejr+=N(r.rejr);});
+  return derive(a);
+}
+function derive(a){
+  a.net=a.netv;
+  a.accTotal=a.tries>0?a.acc/a.tries*100:null;
+  const den=a.accr+a.acco+a.rejr;
+  a.accEff=den>0?(a.accr+a.acco)/den*100:null;
+  a.comp=a.den>0?a.rides/a.den*100:null;
+  a.compAll=a.tries>0?a.rides/a.tries*100:null;
+  a.util=a.oh>0?a.busy/a.oh*100:null;
+  a.rph=a.oh>0?a.rides/a.oh:null;
+  a.eph=a.oh>0?a.gmv/a.oh:null;
+  return a;
+}
+function tierOf(rides){let t=0;TIERS.forEach(([n,p])=>{if(rides>=n)t=p;});return t;}
+function compute(d){
+  const mi=d.mi;
+  const from=iso(mi.ms), to=iso(mi.dataEnd);
+  const m=agg(d.ops,d.rad,from,to);
+  const wks=weeksOf(mi).map(w=>{
+    const a=agg(d.ops,d.rad,w.mon,w.sun);
+    const br=d.brand.filter(r=>r.wk===w.mon);
+    a.brand=br.reduce((s,r)=>s+N(r.brand),0); a.cars=br.reduce((s,r)=>s+N(r.cars),0);
+    a.mon=w.mon;a.sun=w.sun;a.done=w.done;
+    a.brandPct=w.done&&a.gmv>0?a.brand/a.gmv*100:null;
+    return a;
+  });
+  const dw=wks.filter(w=>w.done);
+  const brand=dw.reduce((s,w)=>s+w.brand,0), gAl=dw.reduce((s,w)=>s+w.gmv,0);
+  m.brand=brand; m.brandPct=gAl>0?brand/gAl*100:null;
+  // kickback de flota
+  const tier=tierOf(m.rides);
+  const room=Math.max(0,CAP-(m.brandPct||0))/100*m.gmv;
+  m.tier=tier; m.fleetGross=tier/100*m.gmv; m.fleet=Math.min(m.fleetGross,room); m.capped=m.fleetGross>room+0.005;
+  m.fleetPct=m.gmv>0?m.fleet/m.gmv*100:null;
+  m.supplyPct=m.brandPct==null?null:m.brandPct+(m.fleetPct||0);
+  const elapsed=Math.max(1,mi.dataEnd.getUTCDate());
+  m.proj=mi.closed?m.rides:m.rides/elapsed*mi.days;
+  m.projTier=tierOf(m.proj);
+  m.projGmv=mi.closed?m.gmv:m.gmv/elapsed*mi.days;
+  m.projFleet=Math.min(m.projTier/100*m.projGmv,Math.max(0,CAP/100*m.projGmv-(m.brandPct!=null?m.brandPct/100*m.projGmv:brand)));
+  // por company
+  const cos={};
+  d.snap.ids.forEach(id=>cos[id]={id,gmv:0,net:0,gAl:0,rides:0,oh:0,busy:0,brand:0});
+  d.ops.forEach(r=>{if(r.d<from||r.d>to)return;const c=cos[r.cid]||(cos[r.cid]={id:+r.cid,gmv:0,net:0,gAl:0,rides:0,oh:0,busy:0,brand:0});c.gmv+=N(r.gross);c.net+=N(r.net);c.rides+=N(r.rides);c.oh+=N(r.oh);c.busy+=N(r.busy);if(r.gross!=null&&dw.some(w=>r.d>=w.mon&&r.d<=w.sun))c.gAl+=N(r.gross);});
+  const doneMons=new Set(dw.map(w=>w.mon));
+  d.brand.forEach(r=>{if(!doneMons.has(r.wk))return;const c=cos[r.cid];if(c)c.brand+=N(r.brand);});
+  // serie diaria: del día 1 al último día completo; el supply spend de cada día es el % de su semana (solo semanas cerradas del mes)
+  const dayAgg={};
+  d.ops.forEach(r=>{if(r.d<from||r.d>to)return;const x=dayAgg[r.d]||(dayAgg[r.d]={gmv:0,rides:0});x.gmv+=N(r.gross);x.rides+=N(r.rides);});
+  const days=[];
+  for(let t=mi.ms;t<=mi.dataEnd;t=addD(t,1)){
+    const ds=iso(t), mon=iso(addD(t,-((t.getUTCDay()+6)%7)));
+    const w=wks.find(x=>x.mon===mon);
+    const a=dayAgg[ds]||{gmv:0,rides:0};
+    days.push({d:ds,gmv:a.gmv,rides:a.rides,sp:w&&w.done&&w.brandPct!=null?w.brandPct+(m.fleetPct||0):null});
+  }
+  return {m,wks,cos:Object.values(cos),days};
+}
+
+// ---------- render ----------
+let CUR=null,chart=null;
+function kpi(l,v,s,cls){return `<div class="kpi ${cls||""}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||""}</div></div>`;}
+function render(d){
+  CUR=d;
+  const mi=d.mi;
+  const lab=MES[+mi.ym.slice(5)-1]+" "+mi.ym.slice(0,4);
+  const frozenTxt=mi.closed?(d.snap.frozen?"lista de companies congelada":"sin snapshot: usando lista en vivo"):"lista en vivo del Sheet";
+  $("sub").textContent=(mi.closed?"Mes cerrado":"Mes en curso (MTD)")+" · "+lab+" · "+d.snap.ids.length+" companies";
+  if(d.empty){
+    $("kpis").innerHTML="";$("tierBar").innerHTML="";$("tierGrid").innerHTML="";$("tWeeks").innerHTML="";$("tFleets").innerHTML="";
+    setStatus("Todavía no hay datos cerrados de "+lab+" (los datos llegan a día vencido).");return;
+  }
+  const c=d.frozenC||compute(d), m=c.m;
+  const over=m.supplyPct!=null&&m.supplyPct>CAP+0.0001;
+  const mtd=mi.closed?"":"MTD hasta "+iso(mi.dataEnd).split("-").reverse().join("/");
+  $("kpis").innerHTML=[
+    kpi("Ingresos brutos",eur(m.gmv),mtd||"mes cerrado"),
+    kpi("Ingresos netos",eur(m.net),"tras comisión Bolt ("+pct(m.gmv>0?m.net/m.gmv*100:null)+" de los brutos)"),
+    kpi("Aceptación total",pct(m.accTotal),"aceptados / order tries"),
+    kpi("Aceptación efectiva",pct(m.accEff),"órdenes dentro del radio"),
+    kpi("Tasa de finalización",pct(m.comp),"viajes aceptados · todos los viajes: "+pct(m.compAll)),
+    kpi("Utilización",pct(m.util),"horas con viaje / horas online"),
+    kpi("Rides",nf(m.rides),mi.closed?"":"proyección cierre: "+nf(m.proj)),
+    kpi("RPH",nf(m.rph,2),"rides por hora online"),
+    kpi("EPH",eur(m.eph,2),"ingresos brutos por hora online"),
+    kpi("Branding spend",pct(m.brandPct),eur(m.brand)+" · semanas cerradas","sp"),
+    kpi("Fleet bonus spend",pct(m.fleetPct),eur(m.fleet)+(m.capped?" · recortado por tope":"")+(m.tier?" · nivel "+m.tier+"%":" · sin nivel"),"sp"),
+    kpi("Supply spend",pct(m.supplyPct),"tope "+pct(CAP)+(over?" · SUPERADO":""),"sp"+(over?" over":""))
+  ].join("");
+  // kickback
+  const max=TIERS[TIERS.length-1][0]*1.08;
+  const pos=v=>Math.min(100,v/max*100);
+  let bar=`<div class="fill" style="width:${pos(m.rides)}%"><span class="ft">Viajes acumulados${mi.closed?"":" MTD"}: ${nf(m.rides)}</span></div>`;
+  TIERS.forEach(([n,p])=>{bar+=`<div class="tk" style="left:${pos(n)}%"></div><div class="tl" style="left:${pos(n)}%"><b>${p}%</b>${nf(n)}</div>`;});
+  if(!mi.closed)bar+=`<div class="proj" style="left:${pos(m.proj)}%"></div><div class="pl" style="left:${pos(m.proj)}%;color:var(--warn)">proyección ${nf(m.proj)}</div>`;
+  $("tierBar").innerHTML=bar;
+  $("tierSub").textContent=nf(m.rides)+" rides"+(mi.closed?"":" · MTD");
+  $("tierGrid").innerHTML=[
+    ["Viajes acumulados",nf(m.rides)],
+    ["Nivel alcanzado",m.tier?"Nivel "+m.tier+"%":"Sin nivel",(()=>{const n=TIERS.find(t=>t[0]>m.rides);return n?"Faltan "+nf(n[0]-m.rides)+" viajes para el nivel "+n[1]+"%":"Nivel máximo alcanzado";})()],
+    ["Fleet bonus",eur(m.fleet)+(m.capped?" (recortado por el tope)":""),(m.tier?m.tier+"% × "+eur(m.gmv)+" de ingresos brutos":"Sin nivel alcanzado")+" · Condicionado a un Supply Spend máximo de "+pct(CAP)],
+    mi.closed?null:["Nivel proyectado",(m.projTier?m.projTier+"%":"Sin nivel")+" · ≈ "+eur(m.projFleet)],
+  ].filter(Boolean).map(([l,v,s])=>`<div><div class="l">${l}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:""}</div>`).join("");
+  // semanas
+  const wkLab=w=>{const a=w.mon.split("-"),b=w.sun.split("-");return a[2]+"/"+a[1]+" – "+b[2]+"/"+b[1];};
+  const hd="<thead><tr><th>Semana</th><th>Ingresos brutos</th><th>Ingresos netos</th><th>Acept. total</th><th>Acept. efectiva</th><th>Finaliz.</th><th>Utiliz.</th><th>Rides</th><th>RPH</th><th>EPH</th><th>Branding €</th><th>Branding %</th></tr></thead>";
+  const row=w=>`<tr><td>${wkLab(w)}${w.done?"":' <span class="chip w">en curso</span>'}</td><td>${eur(w.gmv)}</td><td>${eur(w.net)}</td><td>${pct(w.accTotal)}</td><td>${pct(w.accEff)}</td><td>${pct(w.comp)}</td><td>${pct(w.util)}</td><td>${nf(w.rides)}</td><td>${nf(w.rph,2)}</td><td>${eur(w.eph,2)}</td><td>${w.done?eur(w.brand):"—"}</td><td>${pct(w.brandPct)}</td></tr>`;
+  $("tWeeks").innerHTML=hd+"<tbody>"+c.wks.map(row).join("")+`</tbody><tfoot><tr><td>Mes (${mi.closed?"cerrado":"MTD"})</td><td>${eur(m.gmv)}</td><td>${eur(m.net)}</td><td>${pct(m.accTotal)}</td><td>${pct(m.accEff)}</td><td>${pct(m.comp)}</td><td>${pct(m.util)}</td><td>${nf(m.rides)}</td><td>${nf(m.rph,2)}</td><td>${eur(m.eph,2)}</td><td>${eur(m.brand)}</td><td>${pct(m.brandPct)}</td></tr></tfoot>`;
+  $("wkSub").textContent="el branding se paga cuando la semana cierra";
+  // flotas
+  const names=d.names||d.snap.names||{};
+  const cos=c.cos.sort((a,b)=>b.rides-a.rides);
+  const frow=x=>`<td>${eur(x.gmv)}</td><td>${eur(x.net)}</td><td>${nf(x.rides)}</td><td>${nf(x.oh)}</td><td>${pct(x.oh>0?x.busy/x.oh*100:null)}</td><td>${nf(x.oh>0?x.rides/x.oh:null,2)}</td><td>${eur(x.oh>0?x.gmv/x.oh:null,2)}</td><td>${eur(x.brand)}</td><td>${pct(x.gAl>0?x.brand/x.gAl*100:null)}</td>`;
+  const tot={gmv:m.gmv,net:m.net,rides:m.rides,oh:m.oh,busy:m.busy,brand:m.brand,gAl:cos.reduce((s,x)=>s+x.gAl,0)};
+  $("tFleets").innerHTML="<thead><tr><th>Flota</th><th>Company ID</th><th>Ingresos brutos</th><th>Ingresos netos</th><th>Rides</th><th>OH</th><th>Utiliz.</th><th>RPH</th><th>EPH</th><th>Branding €</th><th>Branding spend %</th></tr></thead><tbody>"+
+    cos.map(x=>`<tr><td>${esc(names[x.id]||"—")}</td><td>${x.id}</td>${frow(x)}</tr>`).join("")+`</tbody><tfoot><tr><td>Total</td><td>${cos.length} flotas</td>${frow(tot)}</tr></tfoot>`;
+  const isoWk=s=>{const t=parseD(s);const dn=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-dn+3);const f=U(t.getUTCFullYear(),0,4);return 1+Math.round(((t-f)/864e5-3+((f.getUTCDay()+6)%7))/7);};
+  const dm=s=>s.slice(8)+"/"+s.slice(5,7);
+  $("flNote").innerHTML="<b>Semanas de branding atribuidas a "+MES[+mi.ym.slice(5)-1]+":</b> "+c.wks.map(w=>"W"+isoWk(w.mon)+" ("+dm(w.mon)+"–"+dm(w.sun)+")"+(w.done?"":" en curso, aún sin bonus")).join(" · ")+". Cada semana Lun–Dom cuenta en el mes en que termina; el % de branding usa solo las semanas cerradas.";
+  $("flSub").innerHTML=`<span class="chip ${d.snap.frozen||!mi.closed?"":"w"}">${esc(frozenTxt)}</span>`;
+  // gráfico
+  const days=c.days||[];
+  const labels=days.map(x=>x.d.slice(8)+"/"+x.d.slice(5,7));
+  const css=getComputedStyle(document.documentElement);
+  const col=n=>css.getPropertyValue(n).trim();
+  if(chart)chart.destroy();
+  chart=new Chart($("chart"),{data:{labels,datasets:[
+    {type:"bar",label:"Ingresos brutos (€)",data:days.map(x=>Math.round(x.gmv)),backgroundColor:col("--accent"),borderRadius:3,yAxisID:"y",order:3},
+    {type:"line",label:"Rides",data:days.map(x=>x.rides),borderColor:col("--warn"),backgroundColor:col("--warn"),pointRadius:2,borderWidth:2,tension:.25,yAxisID:"y2",order:2},
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+    plugins:{legend:{labels:{color:col("--muted"),font:{family:"Inter"}}}},
+    scales:{x:{grid:{display:false},ticks:{color:col("--muted")}},y:{grid:{color:col("--grid")},ticks:{color:col("--muted")}},y2:{position:"right",grid:{drawOnChartArea:false},ticks:{color:col("--muted")},suggestedMin:0}}}});
+  setStatus((mi.closed?(d.frozenAt?"Cifras congeladas el "+d.frozenAt.slice(0,10).split("-").reverse().join("/"):"Mes cerrado, cifras aún sin congelar (se congelan el día "+FREEZE_DAY+")"):"Datos a día vencido, hasta el "+iso(mi.dataEnd).split("-").reverse().join("/"))+" · "+d.snap.ids.length+" companies ("+frozenTxt+(d.snap.fresh?", congelada ahora":"")+")"+(d.frozenAt?"":" · consultado "+d.loaded.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})));
+}
+function renderCond(){
+  $("condBody").innerHTML=`
+  <h3>Acuerdo con VTC Plus</h3>
+  <p>Vigente desde el 1 de octubre de 2026. Combina un incentivo por coche (campañas CarBranding) y un kickback mensual de flota.</p>
+  <h3>1. Incentivo por coche · Branding</h3>
+  <p>Bonus semanal de las campañas CarBranding de cada coche (datos de condiciones y cumplimiento en Looker, <i>conditional campaigns</i>). Aquí se suma el importe ganado por coche y semana. Una semana Lun–Dom cuenta en el mes en que termina.</p>
+  <h3>2. Incentivo mensual · Kickback de flota</h3>
+  <table><thead><tr><th>Rides del mes</th><th>% ingresos brutos</th></tr></thead><tbody>${TIERS.map(([n,p])=>`<tr><td>≥ ${nf(n)}</td><td>${p}%</td></tr>`).join("")}</tbody></table>
+  <h3>3. Tope de supply spend</h3>
+  <p>El supply spend del mes (branding spend % + fleet bonus spend %) no puede superar el ${pct(CAP)} de los ingresos brutos. Si el kickback del nivel lo superara, el Fleet bonus se recorta hasta el margen que deja el branding.</p>
+  <h3>Definiciones</h3>
+  <ul>
+   <li><b>Ingresos brutos</b>: movimientos de la cuenta de la flota en payouts (tarifa, peajes, booking fee, cancelaciones y propinas). <b>Ingresos netos</b>: los mismos movimientos tras las comisiones de Bolt.</li>
+   <li><b>Viajes, aceptación total y finalización</b>: order tries de <code>fact_rides_order_try</code> por company del conductor y fecha local de creación, como el portal. Viajes = tries terminados. <b>Aceptación total</b> = tries aceptados / todos los tries. Horas y utilización salen de <code>driver_online_hours_daily</code>.</li>
+   <li><b>Aceptación efectiva</b>: (aceptadas obligatorias + opcionales) / (aceptadas + rechazadas obligatorias); obligatorias = órdenes dentro del radio (<code>driver_reporting_vehicle_acceptance_rate_day</code>).</li>
+   <li><b>Tasa de finalización</b>: viajes terminados / viajes aceptados, como la columna "Tasa de finalización (viajes aceptados)" de Flota › Conductores. En el portal, "viajes aceptados" son los order tries menos los que el conductor no respondió y los que rechazó antes de aceptar; por eso incluye también los cancelados por el cliente antes de que el conductor aceptara. Se muestra también la de todos los viajes (terminados / todos los order tries). Calculada sobre el total de la flota equivale a ponderar la de cada conductor por ese denominador. Contraste con el portal (company 109555, oct.): coinciden viajes, aceptación total y las dos tasas de finalización.</li>
+   <li><b>Conciliación con el portal</b>: los ingresos de este tracker son los de la vista Finanzas sin campañas. En el portal, la vista Vehículos suma además las campañas de vehículos (branding). Ejemplo, company 109555, octubre: €16,016.72 + €1,718.03 de campañas = €17,734.75 brutos en Vehículos. Finanzas › Ingresos por conductor añade otros €26.25 de campañas de flota (€16,042.97).</li>
+   <li><b>Utilización</b>: horas con viaje / (horas con viaje + horas de espera). <b>RPH</b>: rides / hora online. <b>EPH</b>: ingresos brutos / hora online.</li>
+   <li><b>Branding %</b>: bonus de las semanas cerradas del mes / bruta de esas mismas semanas. <b>Fleet bonus %</b>: Fleet bonus / bruta del mes natural.</li>
+  </ul>
+  <h3>Mes en curso y mes cerrado</h3>
+  <ul><li>Datos a día vencido (hasta ayer, hora de Madrid). En el mes en curso, el nivel de kickback se muestra con los rides acumulados y una proyección lineal al cierre.</li>
+  <li>Cada mes cerrado se congela el día ${FREEZE_DAY} del mes siguiente: se guardan la lista de companies y todas las cifras (KPIs, semanas y flotas) en el repositorio (carpeta data/closed) y ya no se vuelven a consultar. Antes de esa fecha el mes se calcula en vivo. Los datos de octubre dejaron de cambiar el 2 de noviembre (7 de 62,012 order tries se actualizaron después, ninguna hora online y ningún bonus de branding). Altas y bajas en el Sheet solo afectan al mes en curso y siguientes.</li></ul>
+  <h3>Companies de este mes</h3>
+  <div>${(CUR&&CUR.snap?CUR.snap.ids:[]).map(i=>`<span class="pill">${i}</span>`).join("")}</div>`;
+}
+
+// ---------- datos incrustados por build.js ----------
+const FREEZE_DAY=3;
+function loadMonth(ym){
+  const b=((window.BAKED||{}).months||{})[ym];
+  if(!b)return null;
+  const mi=monthInfo(ym); mi.dataEnd=parseD(b.dataEnd);
+  const names=b.names||{};
+  return {mi,snap:{ids:b.ids.map(Number),names,frozen:!!b.frozenAt},names,frozenC:b.c,frozenAt:b.frozenAt||null,loaded:new Date(b.asOf)};
+}
+function show(){
+  const ym=$("selMonth").value;lsSet("vtcp_month",ym);
+  const d=loadMonth(ym);
+  if(!d){setStatus("Sin datos para este mes",true);return;}
+  render(d);renderCond();
+}
+function init(){
+  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===b));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("on",p.id==="p-"+b.dataset.t));
+  });
+  const B=window.BAKED;
+  if(!B||!B.months||!Object.keys(B.months).length){setStatus("Sin datos incrustados todavía",true);return;}
+  const months=Object.keys(B.months).sort();
+  $("selMonth").innerHTML=months.slice().reverse().map(x=>`<option value="${x}">${MES[+x.slice(5)-1]} ${x.slice(0,4)}</option>`).join("");
+  const saved=lsGet("vtcp_month");
+  $("selMonth").value=months.includes(saved)?saved:months[months.length-1];
+  $("selMonth").onchange=show;
+  renderCond();
+  show();
+}
+init();
+</script>
