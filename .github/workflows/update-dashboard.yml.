@@ -1,1 +1,107 @@
+name: Actualizar dashboard VTC Plus
 
+# Reconstruye docs/index.html con los datos al dia vencido.
+# GitHub programa los crons "en la medida de lo posible": hay varios por la madrugada y uno por hora
+# hasta las 20:00 (Madrid, verano). Cada ejecucion espera (comprobando cada 10 min, hasta las 07:00 Madrid)
+# a que Databricks tenga cargado el dia de ayer, y solo publica si hay cambios.
+# El dia 3 de cada mes se congela el mes anterior en data/closed/AAAA-MM.json (build.js, una sola vez).
+on:
+  schedule:
+    - cron: '30 3 * * *'     # 05:30 Madrid verano / 04:30 invierno
+    - cron: '30 4 * * *'
+    - cron: '30 5 * * *'
+    - cron: '30 6 * * *'
+    - cron: '5 7-19 * * *'   # refresco horario hasta las 20:00 (verano)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: dashboard-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Estado actual
+        id: check
+        run: |
+          AYER=$(TZ=Europe/Madrid date -d 'yesterday' +%F)
+          echo "ayer=$AYER" >> "$GITHUB_OUTPUT"
+          if grep -q "window.BAKED_DATE=\"$AYER\"" docs/index.html 2>/dev/null; then
+            echo "fresco=si" >> "$GITHUB_OUTPUT"
+          else
+            echo "fresco=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Construir y esperar al dato de ayer
+        id: build
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DATABRICKS_WAREHOUSE_ID: ${{ secrets.DATABRICKS_WAREHOUSE_ID }}
+          SHEET_CSV_URL: ${{ secrets.SHEET_CSV_URL }}
+        run: |
+          FRESCO="${{ steps.check.outputs.fresco }}"
+          while true; do
+            set +e
+            node build.js
+            RC=$?
+            set -e
+            if [ "$RC" -eq 0 ]; then
+              echo "listo=si" >> "$GITHUB_OUTPUT"
+              break
+            elif [ "$RC" -eq 78 ]; then
+              HORA=$(TZ=Europe/Madrid date +%H%M)
+              if [ "$FRESCO" = "si" ] || [ "$((10#$HORA))" -ge 700 ]; then
+                echo "El dato de ayer aun no esta; no se publica en esta ejecucion."
+                echo "listo=no" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "Esperando 10 min al dato de ayer..."
+              sleep 600
+            else
+              echo "Error en build.js (codigo $RC); un reintento en 2 min."
+              sleep 120
+              node build.js || exit 1
+              echo "listo=si" >> "$GITHUB_OUTPUT"
+              break
+            fi
+          done
+
+      - name: Publicar si hay cambios
+        if: steps.build.outputs.listo == 'si'
+        run: |
+          git config user.name  "dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/index.html data/closed
+          if git diff --cached --quiet; then
+            echo "Sin cambios que publicar."
+          else
+            git commit -m "Datos al ${{ steps.check.outputs.ayer }} (publicado $(TZ=Europe/Madrid date +%H:%M) Madrid)"
+            git push
+          fi
+
+      - name: Avisar si ha fallado
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'El dashboard de VTC Plus no se ha actualizado';
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const issues = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'build-failure' });
+            if (issues.data.length) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: issues.data[0].number, body: `Nuevo fallo: ${url}` });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title, labels: ['build-failure'], body: `La ejecucion fallo: ${url}` });
+            }
