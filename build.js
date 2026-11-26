@@ -6,7 +6,8 @@
  * se leen de fleet-template.html y se ejecutan aquí, sin reescribirlas.
  *
  * Variables de entorno (secrets del repo):
- *   DATABRICKS_HOST, DATABRICKS_TOKEN, DATABRICKS_WAREHOUSE_ID, SHEET_CSV_URL
+ *   DATABRICKS_HOST, DATABRICKS_TOKEN, DATABRICKS_WAREHOUSE_ID
+ *   SHEET_CSV_URL (opcional): si no existe, la lista de companies se lee de config/companies.json
  *
  * Códigos de salida: 0 = publicado/listo · 78 = el dato de ayer aún no está en Databricks · otro = error.
  * Uso:  node build.js            (consulta Databricks)
@@ -54,7 +55,7 @@ function csvRows(text) {
 }
 async function getCompanies() {
   const url = process.env.SHEET_CSV_URL;
-  if (!url) throw new Error("Falta SHEET_CSV_URL");
+  if (!url) return fromConfig(); // sin secret SHEET_CSV_URL: lista en config/companies.json
   const r = await fetch(url, { redirect: "follow" });
   if (!r.ok) throw new Error("No se pudo leer el Sheet: HTTP " + r.status);
   const rows = csvRows(await r.text());
@@ -67,10 +68,22 @@ async function getCompanies() {
     const n = +id;
     if (!ids.includes(n)) { ids.push(n); names[n] = String(c[5] || "").replace(/^(OLD\s+\+?)?Madrid\s*Fleet\s*/i, "").trim(); }
   });
+  return check(ids, names, "El Sheet");
+}
+function check(ids, names, origin) {
   ids.sort((a, b) => a - b);
   const missing = SENTINELS.filter(s => !ids.includes(s));
-  if (ids.length < MIN_IDS || missing.length) throw new Error(`El Sheet parece incorrecto: ${ids.length} companies de VTC Plus, faltan IDs de control: ${missing.join(",") || "ninguno"}`);
+  if (ids.length < MIN_IDS || missing.length) throw new Error(`${origin} parece incorrecto: ${ids.length} companies de VTC Plus, faltan IDs de control: ${missing.join(",") || "ninguno"}`);
   return { ids, names };
+}
+function fromConfig() {
+  const f = path.join(ROOT, "config", "companies.json");
+  if (!fs.existsSync(f)) throw new Error("Falta el secret SHEET_CSV_URL y no existe config/companies.json");
+  const list = JSON.parse(fs.readFileSync(f, "utf8")).companies || [];
+  const ids = [], names = {};
+  list.forEach(c => { const n = +c.id; if (n && !ids.includes(n)) { ids.push(n); names[n] = String(c.name || ""); } });
+  console.log("Companies desde config/companies.json:", ids.length);
+  return check(ids, names, "config/companies.json");
 }
 
 // ---------- Databricks (API de SQL statements) ----------
